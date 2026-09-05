@@ -47,19 +47,65 @@ fun menu() {
             "5" -> searchTask(tasks)
             "6" -> filterTask(tasks)
             "7" -> markComplete(tasks)
+            "8" -> showStatistics(tasks)
             "0" -> return
         }
     }
+}
+
+fun showStatistics(tasks: List<Task>) {
+    if (tasks.isEmpty()) {
+        println("No tasks")
+    } else {
+        val total = tasks.count()
+        val totalTodo = tasks.count { it.status == Status.TODO }
+        val totalProcess = tasks.count { it.status == Status.IN_PROGRESS }
+        val totalDone = tasks.count { it.status == Status.DONE }
+
+        val totalLow = tasks.count { it.priority == Priority.LOW }
+        val totalMedium = tasks.count { it.priority == Priority.MEDIUM }
+        val totalHigh = tasks.count { it.priority == Priority.HIGH }
+
+
+        println(
+            "________ STATISTICS ________\n" +
+                    "\n" +
+                    "Total tasks: $total\n" +
+                    "\n" +
+                    "TODO: $totalTodo\n" +
+                    "IN_PROGRESS: $totalProcess\n" +
+                    "DONE: $totalDone\n" +
+                    "\n" +
+                    "LOW: $totalLow\n" +
+                    "MEDIUM: $totalMedium\n" +
+                    "HIGH: $totalHigh"
+        )
+
+    }
+
 }
 
 fun markComplete(tasks: MutableList<Task>) {
     if (tasks.isEmpty()) {
         println("danh sach trong !!!")
     } else {
-
+        println("Vui Long nhap ID :")
+        val keySearch = readln().toIntOrNull()
+        if (keySearch == null) {
+            println("Không tìm thấy task!")
+        } else {
+            val task = tasks.find { keySearch == it.id }
+            if (task == null) {
+                println("Không tìm thấy task!")
+            } else {
+                val index = tasks.indexOfFirst { it.id == task.id }
+                val oldTask = tasks[index]
+                val taskComplete = oldTask.copy(status = Status.DONE)
+                tasks[index] = taskComplete
+                println("update thanh cong !!")
+            }
+        }
     }
-
-
 }
 
 fun filterTask(tasks: List<Task>) {
@@ -155,7 +201,10 @@ fun searchTask(tasks: List<Task>) {
     } else {
         println("vui nhap task can tim kiem ")
         val keySearch = readln()
-        val listSearch = tasks.filter { it.description.contains(keySearch, true) || it.title.contains(keySearch, true) }
+        val listSearch = tasks.filter {
+            it.description.contains(keySearch, true)
+                    || it.title.contains(keySearch, true)
+        }
 
         if (listSearch.isEmpty()) {
             println("Khong tim thay ds")
