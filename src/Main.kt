@@ -3,6 +3,8 @@ import enums.Status
 import model.Task
 import repo.InMemoryTaskRepository
 import repo.TaskRepository
+import result.SearchResult
+import result.TaskResult
 
 fun main() {
 
@@ -43,12 +45,32 @@ fun menu() {
 
         when (readln()) {
             "1" -> addTask(repository)
-            "2" -> deleteTask(repository)
-            "3" -> editTask(repository)
+            "2" -> when (val result = deleteTask(repository)) {
+                TaskResult.Success -> println("Xoa task thanh cong!")
+                is TaskResult.NotFound -> println("Khong tim thay id ${result.id}!")
+                is TaskResult.Error -> println(result.message)
+            }
+
+            "3" -> when (val result = editTask(repository)) {
+                TaskResult.Success -> println("edit thanh cong  !")
+                is TaskResult.NotFound -> println("Khong tim thay id ${result.id}!")
+                is TaskResult.Error -> println(result.message)
+            }
+
             "4" -> showTasks(repository)
-            "5" -> searchTask(repository)
+            "5" -> when (val result = searchTask(repository)) {
+                is SearchResult.SearchSuccess -> println(result.listSearch)
+                is SearchResult.SearchNotFound -> println("Khong tim thay id ${result.id}!")
+                is SearchResult.SearchError -> println(result.message)
+            }
+
             "6" -> filterTask(repository)
-            "7" -> markComplete(repository)
+            "7" -> when (val result = markComplete(repository)) {
+                TaskResult.Success -> println("Task Da done !")
+                is TaskResult.NotFound -> println("Khong tim thay id ${result.id}!")
+                is TaskResult.Error -> println(result.message)
+            }
+
             "8" -> showStatistics(repository)
             "0" -> return
         }
@@ -88,23 +110,22 @@ fun showStatistics(repository: TaskRepository) {
 
 }
 
-fun markComplete(repository: TaskRepository) {
+fun markComplete(repository: TaskRepository): TaskResult {
     val tasks = repository.getAllTasks()
     if (tasks.isEmpty()) {
-        println("danh sach trong !!!")
+        return TaskResult.Error("No tasks")
     } else {
         println("Vui Long nhap ID :")
         val keySearch = readln().toIntOrNull()
         if (keySearch == null) {
-            println("Không tìm thấy task!")
+            return TaskResult.Error("khong tim thay ID")
         } else {
             val task = repository.findTaskById(keySearch)
             if (task == null) {
-                println("Không tìm thấy task!")
+                return TaskResult.Error("khong tim thay task")
             } else {
                 val newTask = task.copy(status = Status.DONE)
-                repository.editTask(newTask)
-                println("update thanh cong !!")
+                return repository.editTask(newTask)
             }
         }
     }
@@ -138,8 +159,8 @@ fun filterTask(repository: TaskRepository) {
 fun filterStatus(tasks: List<Task>) {
     while (true) {
         println(
-            "___Filter Statys ____C" +
-                    "họn Status:\n" +
+            "___Filter Status ____" +
+                    "Chọn Status:\n" +
                     "1. TODO\n" +
                     "2. IN_PROGRESS\n" +
                     "3. DONE "
@@ -198,10 +219,10 @@ fun filterPriority(tasks: List<Task>) {
     }
 }
 
-fun searchTask(repository: TaskRepository) {
+fun searchTask(repository: TaskRepository): SearchResult {
     val tasks = repository.getAllTasks()
     if (tasks.isEmpty()) {
-        println("Danh sach trong !!!!")
+        return SearchResult.SearchError("No tasks were found")
     } else {
         println("vui nhap task can tim kiem ")
         val keySearch = readln()
@@ -211,54 +232,44 @@ fun searchTask(repository: TaskRepository) {
         }
 
         if (listSearch.isEmpty()) {
-            println("Khong tim thay ds")
+            return SearchResult.SearchError("khong tim thay task")
         } else {
             println("DS tim thay")
-            for (taskSearch in listSearch) {
-                println(taskSearch)
-            }
+            return SearchResult.SearchSuccess(listSearch)
         }
     }
 }
 
-fun editTask(repository: TaskRepository) {
+fun editTask(repository: TaskRepository): TaskResult {
     val tasks = repository.getAllTasks()
-    if (repository.getAllTasks().isEmpty()) {
-        println("Nothing to edit!")
-    } else {
-        println("Nhap id can sua :  ")
-        val idEdit = tasks.find { it.id == readln().toIntOrNull() }
-        if (idEdit == null) {
-            println("id not found! ")
-        } else {
-
-            println("Updated task!")
-            println("vui long nhap trang thai ")
-            println("vui long nhap tieu de moi  ")
-            val newTitle = readln()
-            println("vui long nhap noi dung moi  ")
-            val newDes = readln()
-            val updateID =
-                idEdit.copy(
-                    title = newTitle,
-                    status = getStatus(),
-                    priority = getPriority(),
-                    description = newDes
-                )
-            repository.editTask(updateID)
-            println("update thanh cong id :${idEdit.id}")
-        }
-    }
+    if (tasks.isEmpty()) return TaskResult.Error("No tasks were found")
+    println("Nhap id can sua :  ")
+    val idEdit = repository.findTaskById(readln().toIntOrNull() ?: return TaskResult.Error("No tasks were found"))
+    if (idEdit == null) return TaskResult.Error("ID khong hop le ")
+    println("Updated task!")
+    println("vui long nhap trang thai ")
+    println("vui long nhap tieu de moi  ")
+    val newTitle = readln()
+    println("vui long nhap noi dung moi  ")
+    val newDes = readln()
+    val updateID =
+        idEdit.copy(
+            title = newTitle,
+            status = getStatus(),
+            priority = getPriority(),
+            description = newDes
+        )
+    return repository.editTask(updateID)
 }
 
-fun deleteTask(repository: TaskRepository) {
+fun deleteTask(repository: TaskRepository): TaskResult {
     val tasks = repository.getAllTasks()
     if (tasks.isEmpty()) {
-        println("danh sach trong!!!")
+        return TaskResult.NotFound(999999)
     } else {
         println("Nhap ID can xoa  :  ")
-        val id = readln().toIntOrNull() ?: return
-        repository.deleteTask(id = id)
+        val id = readln().toIntOrNull() ?: return TaskResult.Error("ID Khong Hop le!")
+        return repository.deleteTask(id = id)
     }
 }
 
