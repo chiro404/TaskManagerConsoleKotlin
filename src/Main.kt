@@ -1,6 +1,8 @@
 import enums.Priority
 import enums.Status
 import model.Task
+import repo.InMemoryTaskRepository
+import repo.TaskRepository
 
 fun main() {
 
@@ -19,7 +21,7 @@ fun main() {
 }
 
 fun menu() {
-    val tasks = mutableListOf<Task>()
+    val repository: TaskRepository = InMemoryTaskRepository()
     while (true) {
         println("________________TASK MANAGER_________________")
         println(
@@ -40,20 +42,21 @@ fun menu() {
 
 
         when (readln()) {
-            "1" -> addTask(tasks)
-            "2" -> deleteTask(tasks)
-            "3" -> editTask(tasks)
-            "4" -> showTasks(tasks)
-            "5" -> searchTask(tasks)
-            "6" -> filterTask(tasks)
-            "7" -> markComplete(tasks)
-            "8" -> showStatistics(tasks)
+            "1" -> addTask(repository)
+            "2" -> deleteTask(repository)
+            "3" -> editTask(repository)
+            "4" -> showTasks(repository)
+            "5" -> searchTask(repository)
+            "6" -> filterTask(repository)
+            "7" -> markComplete(repository)
+            "8" -> showStatistics(repository)
             "0" -> return
         }
     }
 }
 
-fun showStatistics(tasks: List<Task>) {
+fun showStatistics(repository: TaskRepository) {
+    val tasks = repository.getAllTasks()
     if (tasks.isEmpty()) {
         println("No tasks")
     } else {
@@ -85,7 +88,8 @@ fun showStatistics(tasks: List<Task>) {
 
 }
 
-fun markComplete(tasks: MutableList<Task>) {
+fun markComplete(repository: TaskRepository) {
+    val tasks = repository.getAllTasks()
     if (tasks.isEmpty()) {
         println("danh sach trong !!!")
     } else {
@@ -94,21 +98,20 @@ fun markComplete(tasks: MutableList<Task>) {
         if (keySearch == null) {
             println("Không tìm thấy task!")
         } else {
-            val task = tasks.find { keySearch == it.id }
+            val task = repository.findTaskById(keySearch)
             if (task == null) {
                 println("Không tìm thấy task!")
             } else {
-                val index = tasks.indexOfFirst { it.id == task.id }
-                val oldTask = tasks[index]
-                val taskComplete = oldTask.copy(status = Status.DONE)
-                tasks[index] = taskComplete
+                val newTask = task.copy(status = Status.DONE)
+                repository.editTask(newTask)
                 println("update thanh cong !!")
             }
         }
     }
 }
 
-fun filterTask(tasks: List<Task>) {
+fun filterTask(repository: TaskRepository) {
+    val tasks = repository.getAllTasks()
     while (true) {
         if (tasks.isEmpty()) {
             return println("No tasks were found")
@@ -195,7 +198,8 @@ fun filterPriority(tasks: List<Task>) {
     }
 }
 
-fun searchTask(tasks: List<Task>) {
+fun searchTask(repository: TaskRepository) {
+    val tasks = repository.getAllTasks()
     if (tasks.isEmpty()) {
         println("Danh sach trong !!!!")
     } else {
@@ -217,8 +221,9 @@ fun searchTask(tasks: List<Task>) {
     }
 }
 
-fun editTask(tasks: MutableList<Task>) {
-    if (tasks.isEmpty()) {
+fun editTask(repository: TaskRepository) {
+    val tasks = repository.getAllTasks()
+    if (repository.getAllTasks().isEmpty()) {
         println("Nothing to edit!")
     } else {
         println("Nhap id can sua :  ")
@@ -233,46 +238,37 @@ fun editTask(tasks: MutableList<Task>) {
             val newTitle = readln()
             println("vui long nhap noi dung moi  ")
             val newDes = readln()
-
-
-            val index = tasks.indexOfFirst { it.id == idEdit.id }
-            val oldTask = tasks[index]
             val updateID =
-                oldTask.copy(
+                idEdit.copy(
                     title = newTitle,
                     status = getStatus(),
                     priority = getPriority(),
                     description = newDes
                 )
-            tasks[index] = updateID
+            repository.editTask(updateID)
             println("update thanh cong id :${idEdit.id}")
         }
     }
 }
 
-fun deleteTask(tasks: MutableList<Task>) {
+fun deleteTask(repository: TaskRepository) {
+    val tasks = repository.getAllTasks()
     if (tasks.isEmpty()) {
         println("danh sach trong!!!")
     } else {
         println("Nhap ID can xoa  :  ")
-        val id = readln()
-        val idDelete = tasks.find { it.id == id.toIntOrNull() }
-        if (idDelete != null) {
-            tasks.remove(idDelete)
-        } else {
-            println("Khong tim thay id can xoa ")
-        }
+        val id = readln().toIntOrNull() ?: return
+        repository.deleteTask(id = id)
     }
-
 }
 
-fun addTask(tasks: MutableList<Task>) {
+fun addTask(repository: TaskRepository) {
     println("___Add task__")
     println("Vui lòng nhâp tiêu đề : ")
     val title = readln()
     println("Vui lòng nhâp nột dung: ")
     val des = readln()
-    tasks.add(
+    repository.addTask(
         Task(
             title = title,
             description = des,
@@ -323,12 +319,13 @@ fun getStatus(): Status {
     }
 }
 
-fun showTasks(tasks: List<Task>) {
-    if (tasks.isEmpty()) {
+fun showTasks(repository: TaskRepository) {
+    val list = repository.getAllTasks()
+    if (list.isEmpty()) {
         println("danh sach trong !!!!!!!!")
     } else {
         println("______DANH SACH TASK______")
-        for (task in tasks) {
+        for (task in list) {
             println(
                 """
             ID: ${task.id}
