@@ -5,6 +5,7 @@ import repo.InMemoryTaskRepository
 import repo.TaskRepository
 import result.SearchResult
 import result.TaskResult
+import java.util.concurrent.locks.Condition
 
 fun main() {
 
@@ -13,12 +14,50 @@ fun main() {
     val task1 = Task(1, "task1", "chiro", Priority.MEDIUM, Status.DONE)
     val task2 = Task(2, "task2", "chiro1", Priority.HIGH, Status.IN_PROGRESS)
     val task3 = task2.copy(status = Status.DONE)
+    val tasks = listOf(task1, task2, task3)
 
 //    val (id, title, _, priority) = task2
 //    println(id)
 //    println(title)
 //    println(priority.name)
+    val isDone: (Task) -> Boolean = { it.status == Status.DONE }
+    val isHighTask: (Task) -> Boolean = { it.priority == Priority.HIGH }
+    val highTask = tasks.filter(isHighTask)
 
+    val titles = tasks.map { it.title }
+
+    val highTaskTitles = tasks.filter(isHighTask).map { it.title }
+
+    highTaskTitles.forEach { println(it) }
+    val hasHighTask = tasks.any(isHighTask)
+    val allTaskHigh = tasks.all(isHighTask)
+    val noHighTask = tasks.none(isHighTask)
+    val firstHighTask = tasks.find(isHighTask)
+    val firstHigh = tasks.firstOrNull(isHighTask)
+    val lastHighTask = tasks.lastOrNull(isHighTask)
+
+    val numbers = listOf(1, 2, 3, 4, 5)
+    val sum = numbers.fold(0) { sum, element -> sum + element }
+
+    val totalTitleLength = tasks.fold(0) { acc, element -> sum + element.title.length }
+    numbers.reduce { acc, element ->
+        acc + element
+    }
+
+    val totalDone = tasks.fold(0) { acc, task ->
+        if (task.status == Status.DONE) acc + 1 else acc
+    }
+
+    val numbers1 = listOf(10, 20, 30, 40)
+    val total = numbers.reduce { acc, element -> acc + element }
+}
+
+fun filterTasks(
+    repository: TaskRepository,
+    condition: (Task) -> Boolean
+): List<Task> {
+    val tasks = repository.getAllTasks()
+    return tasks.filter(condition)
 
 }
 
