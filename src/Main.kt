@@ -60,11 +60,16 @@ fun menu() {
             "4" -> showTasks(repository)
             "5" -> when (val result = searchTask(repository)) {
                 is SearchResult.SearchSuccess -> println(result.listSearch)
-                is SearchResult.SearchNotFound -> println("Khong tim thay id ${result.id}!")
+                is SearchResult.SearchNotFound -> println("Khong tim thay id ${result.keyWord}!")
                 is SearchResult.SearchError -> println(result.message)
             }
 
-            "6" -> filterTask(repository)
+            "6" -> when (val result = filterTask(repository)) {
+                is SearchResult.SearchSuccess -> println(result.listSearch)
+                is SearchResult.SearchNotFound -> println("Khong tim thay id ${result.keyWord}!")
+                is SearchResult.SearchError -> println(result.message)
+            }
+
             "7" -> when (val result = markComplete(repository)) {
                 TaskResult.Success -> println("Task Da done !")
                 is TaskResult.NotFound -> println("Khong tim thay id ${result.id}!")
@@ -131,11 +136,11 @@ fun markComplete(repository: TaskRepository): TaskResult {
     }
 }
 
-fun filterTask(repository: TaskRepository) {
+fun filterTask(repository: TaskRepository): SearchResult {
     val tasks = repository.getAllTasks()
     while (true) {
         if (tasks.isEmpty()) {
-            return println("No tasks were found")
+            return SearchResult.SearchError("No tasks")
         } else {
             println(
                 "___Filter Task ____ " +
@@ -147,7 +152,7 @@ fun filterTask(repository: TaskRepository) {
             when (readln()) {
                 "1" -> return filterPriority(tasks)
                 "2" -> return filterStatus(tasks)
-                else -> println("ban nhap sai vui  long nhap lai")
+                else -> SearchResult.SearchError("Ban da nhap sai vui long nhap lai")
             }
 
         }
@@ -156,7 +161,7 @@ fun filterTask(repository: TaskRepository) {
 
 }
 
-fun filterStatus(tasks: List<Task>) {
+fun filterStatus(tasks: List<Task>): SearchResult {
     while (true) {
         println(
             "___Filter Status ____" +
@@ -171,23 +176,19 @@ fun filterStatus(tasks: List<Task>) {
             "2" -> tasks.filter { it.status == Status.IN_PROGRESS }
             "3" -> tasks.filter { it.status == Status.DONE }
             else -> {
-                println("lua chon k hop ly vui long chon lai")
+                SearchResult.SearchError("lua chon k hop ly vui long chon lai")
                 continue
             }
         }
-        if (listSearch.isEmpty()) {
-            println("k tim thay")
-            return
+        return if (listSearch.isEmpty()) {
+            SearchResult.SearchError("task not found")
         } else {
-            for (search in listSearch) {
-                println(search)
-            }
-
+            SearchResult.SearchSuccess(listSearch)
         }
     }
 }
 
-fun filterPriority(tasks: List<Task>) {
+fun filterPriority(tasks: List<Task>): SearchResult {
     while (true) {
         println(
             "___Filter priority ____" +
@@ -203,18 +204,14 @@ fun filterPriority(tasks: List<Task>) {
             "2" -> tasks.filter { it.priority == Priority.MEDIUM }
             "3" -> tasks.filter { it.priority == Priority.HIGH }
             else -> {
-                println("lua chon k hop ly vui long chon lai")
+                SearchResult.SearchError("lua chon k hop ly vui long chon lai")
                 continue
             }
         }
-        if (listSearch.isEmpty()) {
-            println("k tim thay")
-            return
+        return if (listSearch.isEmpty()) {
+            SearchResult.SearchError("list task not found")
         } else {
-            for (search in listSearch) {
-                println(search)
-            }
-
+            SearchResult.SearchSuccess(listSearch)
         }
     }
 }
