@@ -5,12 +5,14 @@ import repo.InMemoryTaskRepository
 import repo.TaskRepository
 import result.SearchResult
 import result.TaskResult
-import java.util.concurrent.locks.Condition
+import java.io.File
+import java.io.IOException
 
 fun main() {
 
     //CRUD
-    menu()
+//    writeFile()
+//    menu()
     val task1 = Task(1, "task1", "chiro", Priority.MEDIUM, Status.DONE)
     val task2 = Task(2, "task2", "chiro1", Priority.HIGH, Status.IN_PROGRESS)
     val task3 = task2.copy(status = Status.DONE)
@@ -50,6 +52,167 @@ fun main() {
 
     val numbers1 = listOf(10, 20, 30, 40)
     val total = numbers.reduce { acc, element -> acc + element }
+    println(numbers1)
+    println(taskToString(task2))
+
+    val taskDemo = listOf(
+        Task(
+            id = 1,
+            title = "Learn Kotlin",
+            description = "Study File I/O",
+            priority = Priority.HIGH,
+            status = Status.IN_PROGRESS
+        ),
+        Task(
+            id = 2,
+            title = "Learn Android",
+            description = "Study Room",
+            priority = Priority.MEDIUM,
+            status = Status.TODO
+        )
+    )
+    saveFile(taskDemo)
+    readTaskFile().forEach { println(it) }
+    loadFileTaskManager().forEach { println(it) }
+}
+
+fun loadFileTaskManager(): List<Task> {
+    return readTaskFile().mapNotNull { line -> taskFromString(line) }
+}
+
+fun saveFile(tasks: List<Task>) {
+    val taskSave = tasks.map { task -> taskToString(task) }
+    val data = taskSave.joinToString(separator = "\n")
+    writeTaskFile(data)
+}
+
+fun taskToString(task: Task): String {
+    return "${task.id}|${task.title}|${task.description}|${task.priority}|${task.status}"
+}
+
+
+fun taskFromString(data: String): Task? {
+    try {
+        val parts = data.split("|")
+
+        // Kiểm tra đủ 5 phần
+        if (parts.size != 5) {
+            println("Invalid task data")
+            return null
+        }
+
+        // Parse ID
+        val id = parts[0].toIntOrNull()
+        if (id == null) {
+            println("Invalid task data")
+            return null
+        }
+
+        // Parse Priority
+        val priority = try {
+            Priority.valueOf(parts[3])
+        } catch (e: IllegalArgumentException) {
+            println("Invalid task data")
+            return null
+        }
+
+        // Parse Status
+        val status = try {
+            Status.valueOf(parts[4])
+        } catch (e: IllegalArgumentException) {
+            println("Invalid task data")
+            return null
+        }
+
+        return Task(
+            id = id,
+            title = parts[1],
+            description = parts[2],
+            priority = priority,
+            status = status
+        )
+
+    } catch (e: IndexOutOfBoundsException) {
+        println("Invalid task data")
+        return null
+    }
+}
+
+fun createDataDirectory() {
+    val dir = File("data")
+    if (!dir.exists()) {
+        dir.mkdirs()
+        println("Created data directory")
+    } else {
+        println("Data directory already exists")
+    }
+}
+
+fun readTaskFile(): List<String> {
+    val file = File("data/tasks.txt")
+    if (!file.exists()) {
+        println("File does not exist")
+    } else {
+        try {
+            val contents = file.readLines()
+            return contents
+        } catch (e: IOException) {
+            println("Error while reading data file ${e.message}")
+        }
+    }
+    return emptyList()
+}
+
+fun appendTaskFile() {
+    createDataDirectory()
+    val taskFile = File("data/tasks.txt")
+    try {
+        taskFile.appendText(
+            "\nDatabase\n" +
+                    "Room\n" +
+                    "Flow"
+        )
+        readTaskFile()
+    } catch (e: IOException) {
+        println("Error while writing data file ${e.message}")
+    }
+}
+
+fun writeTaskFile(data: String) {
+    createDataDirectory()
+    val file = File("data/tasks.txt")
+    try {
+        file.writeText(data)
+        println("Write successfully")
+
+    } catch (e: IOException) {
+        println("Write failed ${e.message}")
+    }
+
+}
+
+fun writeFile() {
+    val dataDir = File("data")
+    try {
+        if (!dataDir.exists()) {
+            dataDir.mkdirs()
+        }
+        val file = File(dataDir, "tasks.txt")
+        file.appendText("create content\n")
+        file.appendText(
+            "Kotlin\n" +
+                    "Android\n" +
+                    "Coroutine\n" +
+                    "Flow"
+        )
+        val contentLines = file.readLines()
+        for (line in contentLines) {
+            println(line)
+        }
+
+    } catch (ex: IOException) {
+        println("Error: ${ex.message}")
+    }
 }
 
 fun filterTasks(
