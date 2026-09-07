@@ -1,6 +1,5 @@
 package result
 
-import model.Task
 
 sealed class TaskResult {
     data object Success : TaskResult()

@@ -1,13 +1,22 @@
 import enums.Priority
 import enums.Status
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import model.Task
 import repo.FileTaskRepository
-import repo.InMemoryTaskRepository
 import repo.TaskRepository
 import result.SearchResult
 import result.TaskResult
 import java.io.File
 import java.io.IOException
+import kotlin.coroutines.cancellation.CancellationException
 
 fun main() {
 
@@ -75,6 +84,26 @@ fun main() {
     saveFile(taskDemo)
     readTaskFile().forEach { println(it) }
     loadFileTaskManager().forEach { println(it) }
+}
+
+
+suspend fun syncTask(repository: TaskRepository) {
+    try {
+        println("Starting sync task")
+        delay(1000)
+        println("loading task ...")
+        currentCoroutineContext().ensureActive()
+        val tasks = withContext(Dispatchers.IO) {
+            repository.getAllTasks()
+        }
+        currentCoroutineContext().ensureActive()
+        delay(1000)
+        println("Found ${tasks.size} tasks")
+        delay(1000)
+        println("Sync complete")
+    } catch (e: CancellationException) {
+        println("sync  Cancelled ")
+    }
 }
 
 fun loadFileTaskManager(): List<Task> {
@@ -227,6 +256,8 @@ fun filterTasks(
 
 fun menu() {
     val repository: TaskRepository = FileTaskRepository()
+    val scope = CoroutineScope(Dispatchers.Default)
+    var job: Job? = null
     while (true) {
         println("________________TASK MANAGER_________________")
         println(
@@ -280,6 +311,18 @@ fun menu() {
             }
 
             "8" -> showStatistics(repository)
+            "11" -> {
+                if (job?.isActive == true) {
+                    println("Sync is already running")
+                } else {
+                    job = scope.launch {
+                        syncTask(repository)
+                    }
+                }
+            }
+
+            "12" -> job?.cancel()
+
             "0" -> return
         }
     }
