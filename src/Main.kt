@@ -6,14 +6,18 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.buffer
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import model.Task
 import repo.FileTaskRepository
 import repo.TaskRepository
 import result.SearchResult
 import result.TaskResult
+import kotlinx.coroutines.flow.map
 import java.io.File
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
@@ -84,8 +88,104 @@ fun main() {
     saveFile(taskDemo)
     readTaskFile().forEach { println(it) }
     loadFileTaskManager().forEach { println(it) }
+
+    runBlocking {
+        println("before colect")
+        numberFlow().collect{ println(it) }
+        println("after colect")
+        numberFlow1().collect{ println("Received:$it") }
+        stringsFlow.flowOn(Dispatchers.IO).map { it.uppercase() }.collect {
+            println("Collect thread: ${Thread.currentThread().name}")
+            println(it)
+        }
+        numFlows.buffer().collect {
+            println(it)
+            delay(1000)
+        }
+//         buffer cho phep emit tiep tuc chay trong khi collect xu ly data
+//         collect
+
+
+        launch {
+            println("Collect lần 1")
+            numberFlow1().collect {
+                println(it)
+            }
+        }
+        taskFlow().collect { println(it) }
+
+        launch {
+            println("Collect lần 2")
+
+            numberFlow().collect {
+                println(it)
+            }
+        }
+    }
+
 }
 
+val numFlows = flow {
+    for (i in 1..5) {
+        println("emit: $i")
+        emit(i)
+    }
+}
+
+val stringsFlow = flow {
+    println("Flow thread: ${Thread.currentThread().name}")
+    emit("one")
+    emit("two")
+    emit("three")
+    emit("four")
+}
+
+fun taskFlow() = flow {
+    emit("Task 1")
+    delay(1000)
+    emit("Task 2")
+    delay(1000)
+    emit("Task 3")
+}
+
+
+// flow
+fun numberFlow() = flow {
+    println("Flow started")
+    delay(1000)
+    emit(1)
+    delay(1000)
+    emit(2)
+    delay(1000)
+    emit(3)
+    delay(1000)
+    emit(4)
+    delay(1000)
+    emit(5)
+    delay(1000)
+    emit(6)
+    delay(1000)
+    emit(7)
+}
+
+// flow
+fun numberFlow1() = flow {
+    println("Flow started")
+    delay(1000)
+    emit(10)
+    delay(1000)
+    emit(20)
+    delay(1000)
+    emit(30)
+    delay(1000)
+    emit(40)
+    delay(1000)
+    emit(50)
+    delay(1000)
+    emit(60)
+    delay(1000)
+    emit(70)
+}
 
 suspend fun syncTask(repository: TaskRepository) {
     try {
@@ -94,7 +194,7 @@ suspend fun syncTask(repository: TaskRepository) {
         println("loading task ...")
         currentCoroutineContext().ensureActive()
         val tasks = withContext(Dispatchers.IO) {
-            repository.getAllTasks()
+            repository.tasks.value
         }
         currentCoroutineContext().ensureActive()
         delay(1000)
@@ -249,7 +349,7 @@ fun filterTasks(
     repository: TaskRepository,
     condition: (Task) -> Boolean
 ): List<Task> {
-    val tasks = repository.getAllTasks()
+    val tasks = repository.tasks.value
     return tasks.filter(condition)
 
 }
@@ -259,6 +359,7 @@ fun menu() {
     val scope = CoroutineScope(Dispatchers.Default)
     var job: Job? = null
     while (true) {
+
         println("________________TASK MANAGER_________________")
         println(
             "1. Thêm task\n" +
@@ -275,7 +376,6 @@ fun menu() {
                     "12. Hủy quá trình đồng bộ\n" +
                     "0. Thoát"
         )
-
 
         when (readln()) {
             "1" -> addTask(repository)
@@ -326,10 +426,12 @@ fun menu() {
             "0" -> return
         }
     }
+
+
 }
 
 fun showStatistics(repository: TaskRepository) {
-    val tasks = repository.getAllTasks()
+    val tasks = repository.tasks.value
     if (tasks.isEmpty()) {
         println("No tasks")
     } else {
@@ -362,7 +464,7 @@ fun showStatistics(repository: TaskRepository) {
 }
 
 fun markComplete(repository: TaskRepository): TaskResult {
-    val tasks = repository.getAllTasks()
+    val tasks = repository.tasks.value
     if (tasks.isEmpty()) {
         return TaskResult.Error("No tasks")
     } else {
@@ -383,7 +485,7 @@ fun markComplete(repository: TaskRepository): TaskResult {
 }
 
 fun filterTask(repository: TaskRepository): SearchResult {
-    val tasks = repository.getAllTasks()
+    val tasks =repository.tasks.value
     while (true) {
         if (tasks.isEmpty()) {
             return SearchResult.SearchError("No tasks")
@@ -463,7 +565,7 @@ fun filterPriority(tasks: List<Task>): SearchResult {
 }
 
 fun searchTask(repository: TaskRepository): SearchResult {
-    val tasks = repository.getAllTasks()
+    val tasks = repository.tasks.value
     if (tasks.isEmpty()) {
         return SearchResult.SearchError("No tasks were found")
     } else {
@@ -484,7 +586,7 @@ fun searchTask(repository: TaskRepository): SearchResult {
 }
 
 fun editTask(repository: TaskRepository): TaskResult {
-    val tasks = repository.getAllTasks()
+    val tasks = repository.tasks.value
     if (tasks.isEmpty()) return TaskResult.Error("No tasks were found")
     println("Nhap id can sua :  ")
     val idEdit = repository.findTaskById(readln().toIntOrNull() ?: return TaskResult.Error("No tasks were found"))
@@ -506,7 +608,7 @@ fun editTask(repository: TaskRepository): TaskResult {
 }
 
 fun deleteTask(repository: TaskRepository): TaskResult {
-    val tasks = repository.getAllTasks()
+    val tasks = repository.tasks.value
     if (tasks.isEmpty()) {
         return TaskResult.NotFound(999999)
     } else {
@@ -574,7 +676,7 @@ fun getStatus(): Status {
 }
 
 fun showTasks(repository: TaskRepository) {
-    val list = repository.getAllTasks()
+    val list = repository.tasks.value
     if (list.isEmpty()) {
         println("danh sach trong !!!!!!!!")
     } else {

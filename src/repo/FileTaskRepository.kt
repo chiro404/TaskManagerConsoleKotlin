@@ -1,5 +1,7 @@
 package repo
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import model.Task
 import readTaskFile
 import result.TaskResult
@@ -8,10 +10,19 @@ import taskToString
 import writeTaskFile
 
 class FileTaskRepository : TaskRepository {
+
+    private val _tasks = MutableStateFlow<List<Task>>(emptyList())
+    override val tasks: StateFlow<List<Task>> = _tasks
+
+    init {
+        _tasks.value = loadFileTaskManager()
+    }
+
     override fun addTask(task: Task) {
         val tasks = loadFileTaskManager().toMutableList()
         tasks.add(task)
         saveFile(tasks)
+        _tasks.value = tasks
     }
 
     override fun deleteTask(id: Int): TaskResult {
@@ -26,13 +37,11 @@ class FileTaskRepository : TaskRepository {
         tasks.remove(task)
 
         saveFile(tasks)
+        _tasks.value = tasks
 
         return TaskResult.Success
     }
 
-    override fun getAllTasks(): List<Task> {
-        return loadFileTaskManager()
-    }
 
     override fun editTask(newTask: Task): TaskResult {
         val tasks = loadFileTaskManager().toMutableList()
@@ -46,12 +55,13 @@ class FileTaskRepository : TaskRepository {
         tasks[index] = newTask
 
         saveFile(tasks)
+        _tasks.value = tasks
 
         return TaskResult.Success
     }
 
     override fun findTaskById(id: Int): Task? {
-        return loadFileTaskManager().find { task -> task.id == id }
+        return _tasks.value.find { it.id == id }
     }
 
     private fun loadFileTaskManager(): List<Task> {
