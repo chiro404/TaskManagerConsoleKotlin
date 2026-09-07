@@ -1,6 +1,7 @@
 import enums.Priority
 import enums.Status
 import model.Task
+import repo.FileTaskRepository
 import repo.InMemoryTaskRepository
 import repo.TaskRepository
 import result.SearchResult
@@ -12,7 +13,7 @@ fun main() {
 
     //CRUD
 //    writeFile()
-//    menu()
+    menu()
     val task1 = Task(1, "task1", "chiro", Priority.MEDIUM, Status.DONE)
     val task2 = Task(2, "task2", "chiro1", Priority.HIGH, Status.IN_PROGRESS)
     val task3 = task2.copy(status = Status.DONE)
@@ -225,7 +226,7 @@ fun filterTasks(
 }
 
 fun menu() {
-    val repository: TaskRepository = InMemoryTaskRepository()
+    val repository: TaskRepository = FileTaskRepository()
     while (true) {
         println("________________TASK MANAGER_________________")
         println(
