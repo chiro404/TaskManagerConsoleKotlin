@@ -18,6 +18,7 @@ import repo.TaskRepository
 import result.SearchResult
 import result.TaskResult
 import kotlinx.coroutines.flow.map
+import viewmodel.TaskViewModel
 import java.io.File
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
@@ -91,9 +92,9 @@ fun main() {
 
     runBlocking {
         println("before colect")
-        numberFlow().collect{ println(it) }
+        numberFlow().collect { println(it) }
         println("after colect")
-        numberFlow1().collect{ println("Received:$it") }
+        numberFlow1().collect { println("Received:$it") }
         stringsFlow.flowOn(Dispatchers.IO).map { it.uppercase() }.collect {
             println("Collect thread: ${Thread.currentThread().name}")
             println(it)
@@ -187,14 +188,14 @@ fun numberFlow1() = flow {
     emit(70)
 }
 
-suspend fun syncTask(repository: TaskRepository) {
+suspend fun syncTask(viewModel: TaskViewModel) {
     try {
         println("Starting sync task")
         delay(1000)
         println("loading task ...")
         currentCoroutineContext().ensureActive()
         val tasks = withContext(Dispatchers.IO) {
-            repository.tasks.value
+            viewModel.tasks.value
         }
         currentCoroutineContext().ensureActive()
         delay(1000)
@@ -356,6 +357,7 @@ fun filterTasks(
 
 fun menu() {
     val repository: TaskRepository = FileTaskRepository()
+    val viewModel = TaskViewModel(repository)
     val scope = CoroutineScope(Dispatchers.Default)
     var job: Job? = null
     while (true) {
@@ -378,45 +380,45 @@ fun menu() {
         )
 
         when (readln()) {
-            "1" -> addTask(repository)
-            "2" -> when (val result = deleteTask(repository)) {
+            "1" -> addTask(viewModel)
+            "2" -> when (val result = deleteTask(viewModel)) {
                 TaskResult.Success -> println("Xoa task thanh cong!")
                 is TaskResult.NotFound -> println("Khong tim thay id ${result.id}!")
                 is TaskResult.Error -> println(result.message)
             }
 
-            "3" -> when (val result = editTask(repository)) {
+            "3" -> when (val result = editTask(viewModel)) {
                 TaskResult.Success -> println("edit thanh cong  !")
                 is TaskResult.NotFound -> println("Khong tim thay id ${result.id}!")
                 is TaskResult.Error -> println(result.message)
             }
 
-            "4" -> showTasks(repository)
-            "5" -> when (val result = searchTask(repository)) {
+            "4" -> showTasks(viewModel)
+            "5" -> when (val result = searchTask(viewModel)) {
                 is SearchResult.SearchSuccess -> println(result.listSearch)
                 is SearchResult.SearchNotFound -> println("Khong tim thay id ${result.keyWord}!")
                 is SearchResult.SearchError -> println(result.message)
             }
 
-            "6" -> when (val result = filterTask(repository)) {
+            "6" -> when (val result = filterTask(viewModel)) {
                 is SearchResult.SearchSuccess -> println(result.listSearch)
                 is SearchResult.SearchNotFound -> println("Khong tim thay id ${result.keyWord}!")
                 is SearchResult.SearchError -> println(result.message)
             }
 
-            "7" -> when (val result = markComplete(repository)) {
+            "7" -> when (val result = markComplete(viewModel)) {
                 TaskResult.Success -> println("Task Da done !")
                 is TaskResult.NotFound -> println("Khong tim thay id ${result.id}!")
                 is TaskResult.Error -> println(result.message)
             }
 
-            "8" -> showStatistics(repository)
+            "8" -> showStatistics(viewModel)
             "11" -> {
                 if (job?.isActive == true) {
                     println("Sync is already running")
                 } else {
                     job = scope.launch {
-                        syncTask(repository)
+                        syncTask(viewModel)
                     }
                 }
             }
@@ -430,78 +432,52 @@ fun menu() {
 
 }
 
-fun showStatistics(repository: TaskRepository) {
-    val tasks = repository.tasks.value
-    if (tasks.isEmpty()) {
+fun showStatistics(viewModel: TaskViewModel) {
+    val statistics = viewModel.getStatistics()
+
+    if (statistics.total == 0) {
         println("No tasks")
-    } else {
-        val total = tasks.count()
-        val totalTodo = tasks.count { it.status == Status.TODO }
-        val totalProcess = tasks.count { it.status == Status.IN_PROGRESS }
-        val totalDone = tasks.count { it.status == Status.DONE }
+        return
+    }
 
-        val totalLow = tasks.count { it.priority == Priority.LOW }
-        val totalMedium = tasks.count { it.priority == Priority.MEDIUM }
-        val totalHigh = tasks.count { it.priority == Priority.HIGH }
+    println(
+        """
+        ________ STATISTICS ________
+
+        Total tasks: ${statistics.total}
+
+        TODO: ${statistics.totalTodo}
+        IN_PROGRESS: ${statistics.totalProcess}
+        DONE: ${statistics.totalDone}
+
+        LOW: ${statistics.totalLow}
+        MEDIUM: ${statistics.totalMedium}
+        HIGH: ${statistics.totalHigh}
+        """.trimIndent()
+    )
+}
+
+fun markComplete(viewModel: TaskViewModel): TaskResult {
+    println("Vui Long nhap ID :")
+    val keySearch = readln().toIntOrNull() ?: return TaskResult.Error("khong tim thay ID")
+    return viewModel.markComplete(keySearch)
+}
 
 
+fun filterTask(viewModel: TaskViewModel): SearchResult {
+    while (true) {
         println(
-            "________ STATISTICS ________\n" +
-                    "\n" +
-                    "Total tasks: $total\n" +
-                    "\n" +
-                    "TODO: $totalTodo\n" +
-                    "IN_PROGRESS: $totalProcess\n" +
-                    "DONE: $totalDone\n" +
-                    "\n" +
-                    "LOW: $totalLow\n" +
-                    "MEDIUM: $totalMedium\n" +
-                    "HIGH: $totalHigh"
+            "___Filter Task ____ " +
+                    "Chọn kiểu lọc:\n" +
+                    "1. Priority\n" +
+                    "2. Status"
         )
 
-    }
+        when (readln()) {
+            "1" -> return filterPriority(viewModel)
+            "2" -> return filterStatus(viewModel)
+            else -> SearchResult.SearchError("Ban da nhap sai vui long nhap lai")
 
-}
-
-fun markComplete(repository: TaskRepository): TaskResult {
-    val tasks = repository.tasks.value
-    if (tasks.isEmpty()) {
-        return TaskResult.Error("No tasks")
-    } else {
-        println("Vui Long nhap ID :")
-        val keySearch = readln().toIntOrNull()
-        if (keySearch == null) {
-            return TaskResult.Error("khong tim thay ID")
-        } else {
-            val task = repository.findTaskById(keySearch)
-            if (task == null) {
-                return TaskResult.Error("khong tim thay task")
-            } else {
-                val newTask = task.copy(status = Status.DONE)
-                return repository.editTask(newTask)
-            }
-        }
-    }
-}
-
-fun filterTask(repository: TaskRepository): SearchResult {
-    val tasks =repository.tasks.value
-    while (true) {
-        if (tasks.isEmpty()) {
-            return SearchResult.SearchError("No tasks")
-        } else {
-            println(
-                "___Filter Task ____ " +
-                        "Chọn kiểu lọc:\n" +
-                        "1. Priority\n" +
-                        "2. Status"
-            )
-
-            when (readln()) {
-                "1" -> return filterPriority(tasks)
-                "2" -> return filterStatus(tasks)
-                else -> SearchResult.SearchError("Ban da nhap sai vui long nhap lai")
-            }
 
         }
 
@@ -509,7 +485,7 @@ fun filterTask(repository: TaskRepository): SearchResult {
 
 }
 
-fun filterStatus(tasks: List<Task>): SearchResult {
+fun filterStatus(viewModel: TaskViewModel): SearchResult {
     while (true) {
         println(
             "___Filter Status ____" +
@@ -519,24 +495,18 @@ fun filterStatus(tasks: List<Task>): SearchResult {
                     "3. DONE "
         )
 
-        val listSearch = when (readln()) {
-            "1" -> tasks.filter { it.status == Status.TODO }
-            "2" -> tasks.filter { it.status == Status.IN_PROGRESS }
-            "3" -> tasks.filter { it.status == Status.DONE }
+        when (readln()) {
+            "1" -> viewModel.filterByStatus(Status.TODO)
+            "2" -> viewModel.filterByStatus(Status.IN_PROGRESS)
+            "3" -> viewModel.filterByStatus(Status.DONE)
             else -> {
                 SearchResult.SearchError("lua chon k hop ly vui long chon lai")
-                continue
             }
-        }
-        return if (listSearch.isEmpty()) {
-            SearchResult.SearchError("task not found")
-        } else {
-            SearchResult.SearchSuccess(listSearch)
         }
     }
 }
 
-fun filterPriority(tasks: List<Task>): SearchResult {
+fun filterPriority(viewModel: TaskViewModel): SearchResult {
     while (true) {
         println(
             "___Filter priority ____" +
@@ -546,50 +516,28 @@ fun filterPriority(tasks: List<Task>): SearchResult {
                     "3. HIGH"
 
         )
-
-        val listSearch = when (readln()) {
-            "1" -> tasks.filter { it.priority == Priority.LOW }
-            "2" -> tasks.filter { it.priority == Priority.MEDIUM }
-            "3" -> tasks.filter { it.priority == Priority.HIGH }
+        when (readln()) {
+            "1" -> viewModel.filterByPriority(Priority.LOW)
+            "2" -> viewModel.filterByPriority(Priority.MEDIUM)
+            "3" -> viewModel.filterByPriority(Priority.HIGH)
             else -> {
                 SearchResult.SearchError("lua chon k hop ly vui long chon lai")
-                continue
             }
         }
-        return if (listSearch.isEmpty()) {
-            SearchResult.SearchError("list task not found")
-        } else {
-            SearchResult.SearchSuccess(listSearch)
-        }
     }
 }
 
-fun searchTask(repository: TaskRepository): SearchResult {
-    val tasks = repository.tasks.value
-    if (tasks.isEmpty()) {
-        return SearchResult.SearchError("No tasks were found")
-    } else {
-        println("vui nhap task can tim kiem ")
-        val keySearch = readln()
-        val listSearch = tasks.filter {
-            it.description.contains(keySearch, true)
-                    || it.title.contains(keySearch, true)
-        }
-
-        if (listSearch.isEmpty()) {
-            return SearchResult.SearchError("khong tim thay task")
-        } else {
-            println("DS tim thay")
-            return SearchResult.SearchSuccess(listSearch)
-        }
-    }
+fun searchTask(viewModel: TaskViewModel): SearchResult {
+    println("vui nhap task can tim kiem ")
+    val keySearch = readln()
+    return viewModel.searchTasks(keySearch)
 }
 
-fun editTask(repository: TaskRepository): TaskResult {
-    val tasks = repository.tasks.value
+fun editTask(viewModel: TaskViewModel): TaskResult {
+    val tasks = viewModel.tasks.value
     if (tasks.isEmpty()) return TaskResult.Error("No tasks were found")
     println("Nhap id can sua :  ")
-    val idEdit = repository.findTaskById(readln().toIntOrNull() ?: return TaskResult.Error("No tasks were found"))
+    val idEdit = viewModel.findTaskById(readln().toIntOrNull() ?: return TaskResult.Error("No tasks were found"))
     if (idEdit == null) return TaskResult.Error("ID khong hop le ")
     println("Updated task!")
     println("vui long nhap trang thai ")
@@ -604,27 +552,27 @@ fun editTask(repository: TaskRepository): TaskResult {
             priority = getPriority(),
             description = newDes
         )
-    return repository.editTask(updateID)
+    return viewModel.editTask(updateID)
 }
 
-fun deleteTask(repository: TaskRepository): TaskResult {
-    val tasks = repository.tasks.value
+fun deleteTask(viewModel: TaskViewModel): TaskResult {
+    val tasks = viewModel.tasks.value
     if (tasks.isEmpty()) {
         return TaskResult.NotFound(999999)
     } else {
         println("Nhap ID can xoa  :  ")
         val id = readln().toIntOrNull() ?: return TaskResult.Error("ID Khong Hop le!")
-        return repository.deleteTask(id = id)
+        return viewModel.deleteTask(id)
     }
 }
 
-fun addTask(repository: TaskRepository) {
+fun addTask(viewModel: TaskViewModel) {
     println("___Add task__")
     println("Vui lòng nhâp tiêu đề : ")
     val title = readln()
     println("Vui lòng nhâp nột dung: ")
     val des = readln()
-    repository.addTask(
+    viewModel.addTask(
         Task(
             title = title,
             description = des,
@@ -675,8 +623,8 @@ fun getStatus(): Status {
     }
 }
 
-fun showTasks(repository: TaskRepository) {
-    val list = repository.tasks.value
+fun showTasks(viewModel: TaskViewModel) {
+    val list = viewModel.tasks.value
     if (list.isEmpty()) {
         println("danh sach trong !!!!!!!!")
     } else {

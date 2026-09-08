@@ -19,14 +19,14 @@ class FileTaskRepository : TaskRepository {
     }
 
     override fun addTask(task: Task) {
-        val tasks = loadFileTaskManager().toMutableList()
+        val tasks = _tasks.value.toMutableList()
         tasks.add(task)
         saveFile(tasks)
         _tasks.value = tasks
     }
 
     override fun deleteTask(id: Int): TaskResult {
-        val tasks = loadFileTaskManager().toMutableList()
+        val tasks = _tasks.value.toMutableList()
 
         val task = tasks.find { it.id == id }
 
@@ -44,7 +44,7 @@ class FileTaskRepository : TaskRepository {
 
 
     override fun editTask(newTask: Task): TaskResult {
-        val tasks = loadFileTaskManager().toMutableList()
+        val tasks = _tasks.value.toMutableList()
 
         val index = tasks.indexOfFirst { it.id == newTask.id }
 
